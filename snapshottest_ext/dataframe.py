@@ -6,6 +6,14 @@ from snapshottest.formatter import Formatter
 from snapshottest.formatters import BaseFormatter
 
 
+class ResilientBytesIO(BytesIO):
+    def close(self):
+        pass  # Refuse to close to avoid pandas bug
+
+    def really_close(self):
+        super().close()
+
+
 def get_timestamp_columns(df):
     object_cols = [
         col for col, dtype in df.dtypes.items() if dtype == 'object'
@@ -21,8 +29,8 @@ def pandas_to_bytes(df: pd.DataFrame) -> str:
     nontimestamp_columns = list(set(df.columns).difference(timestamp_columns))
     relevant_df = df[nontimestamp_columns]
 
-    buffer = BytesIO()
-    relevant_df.to_parquet(buffer, use_deprecated_int96_timestamps=True)
+    buffer = ResilientBytesIO()
+    relevant_df.to_pickle(buffer)
     buffer.seek(0)
     buffer_bytes = buffer.read()
     dtypes_str = json.dumps(relevant_df.dtypes.astype(str).to_dict())
@@ -31,7 +39,7 @@ def pandas_to_bytes(df: pd.DataFrame) -> str:
 
 def bytes_to_pandas(raw_bytes) -> pd.DataFrame:
     data_bytes, dtypes_bytes = raw_bytes.split(bytes('//SEP?//', 'utf-8'))
-    df = pd.read_parquet(BytesIO(data_bytes))
+    df = pd.read_pickle(ResilientBytesIO(data_bytes))
     dtypes = json.loads(dtypes_bytes.decode())
     return df.astype(dtypes)
 
