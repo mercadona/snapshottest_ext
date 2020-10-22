@@ -17,11 +17,15 @@ def get_timestamp_columns(df):
 
 
 def pandas_to_bytes(df: pd.DataFrame) -> str:
+    timestamp_columns = get_timestamp_columns(df)
+    nontimestamp_columns = list(set(df.columns).difference(timestamp_columns))
+    relevant_df = df[nontimestamp_columns]
+
     buffer = BytesIO()
-    df.to_parquet(buffer, use_deprecated_int96_timestamps=True)
+    relevant_df.to_parquet(buffer, use_deprecated_int96_timestamps=True)
     buffer.seek(0)
     buffer_bytes = buffer.read()
-    dtypes_str = json.dumps(df.dtypes.astype(str).to_dict())
+    dtypes_str = json.dumps(relevant_df.dtypes.astype(str).to_dict())
     return buffer_bytes + bytes(f'//SEP?//{dtypes_str}', 'utf-8')
 
 
